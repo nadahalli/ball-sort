@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Ball Sort Puzzle</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: #1a1a2e;
+  color: #eee;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  user-select: none;
+  -webkit-user-select: none;
+  overflow-x: hidden;
+}
+
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  max-width: 600px;
+  padding: 12px 16px;
+}
+
+header .left, header .right { display: flex; gap: 8px; align-items: center; }
+
+.level-label {
+  font-size: 18px;
+  font-weight: 700;
+  color: #e0e0ff;
+}
+
+.move-counter {
+  font-size: 15px;
+  color: #aaa;
+}
+
+button {
+  background: #2a2a4a;
+  color: #ccc;
+  border: 1px solid #444;
+  border-radius: 8px;
+  padding: 6px 14px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+button:hover { background: #3a3a5a; }
+button:active { background: #4a4a6a; }
+
+#game-area {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  max-width: 600px;
+  padding: 8px;
+}
+
+#tubes-container {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+}
+
+.tube-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+  transition: transform 0.15s;
+}
+
+.tube-wrapper.selected { transform: translateY(-8px); }
+
+.tube {
+  width: 52px;
+  height: 180px;
+  border: 3px solid #556;
+  border-top: none;
+  border-radius: 0 0 22px 22px;
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: center;
+  padding: 4px 0;
+  gap: 2px;
+  position: relative;
+  background: rgba(255,255,255,0.03);
+}
+
+.tube-wrapper.selected .tube {
+  border-color: #8af;
+  box-shadow: 0 0 12px rgba(100,160,255,0.3);
+}
+
+.ball {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  transition: transform 0.12s, opacity 0.12s;
+}
+
+/* Ball colors with glossy look */
+.ball-0 { background: radial-gradient(circle at 35% 35%, #ff6b6b, #c0392b); }
+.ball-1 { background: radial-gradient(circle at 35% 35%, #54a0ff, #2e86de); }
+.ball-2 { background: radial-gradient(circle at 35% 35%, #5fe09a, #27ae60); }
+.ball-3 { background: radial-gradient(circle at 35% 35%, #feca57, #f39c12); }
+.ball-4 { background: radial-gradient(circle at 35% 35%, #ff9ff3, #e056a0); }
+.ball-5 { background: radial-gradient(circle at 35% 35%, #ff9f43, #e67e22); }
+.ball-6 { background: radial-gradient(circle at 35% 35%, #a29bfe, #6c5ce7); }
+.ball-7 { background: radial-gradient(circle at 35% 35%, #00d2d3, #01a3a4); }
+
+.ball::after {
+  content: '';
+  position: absolute;
+  width: 16px;
+  height: 10px;
+  background: radial-gradient(ellipse, rgba(255,255,255,0.5), transparent);
+  border-radius: 50%;
+  top: 6px;
+  left: 10px;
+  pointer-events: none;
+}
+
+.ball { position: relative; }
+
+/* Modal overlay */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  animation: fadeIn 0.2s;
+}
+
+.modal {
+  background: #2a2a4a;
+  border-radius: 16px;
+  padding: 28px 24px;
+  text-align: center;
+  max-width: 340px;
+  width: 90%;
+  animation: popIn 0.25s;
+}
+
+.modal h2 { margin-bottom: 12px; font-size: 22px; color: #e0e0ff; }
+.modal p { margin-bottom: 16px; color: #bbb; font-size: 15px; }
+
+.modal .btn-row {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 16px;
+}
+
+.modal .btn-row button {
+  padding: 10px 20px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.btn-primary {
+  background: #4a6cf7 !important;
+  color: #fff !important;
+  border-color: #5a7cf7 !important;
+}
+
+.btn-primary:hover { background: #5a7cf7 !important; }
+
+/* Leaderboard table */
+.lb-table {
+  width: 100%;
+  margin-top: 12px;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.lb-table th {
+  color: #8af;
+  text-align: left;
+  padding: 4px 8px;
+  border-bottom: 1px solid #444;
+}
+
+.lb-table td {
+  padding: 4px 8px;
+  color: #ccc;
+}
+
+.lb-table tr:nth-child(even) td { background: rgba(255,255,255,0.03); }
+
+.lb-scroll {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes popIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+/* Win confetti */
+@keyframes confettiFall {
+  0% { transform: translateY(-10vh) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(110vh) rotate(720deg); opacity: 0; }
+}
+
+.confetti {
+  position: fixed;
+  width: 10px;
+  height: 10px;
+  z-index: 200;
+  pointer-events: none;
+  animation: confettiFall linear forwards;
+}
+
+/* Responsive: shrink tubes on small screens */
+@media (max-width: 420px) {
+  .tube { width: 42px; height: 150px; }
+  .ball { width: 34px; height: 34px; }
+  .ball::after { width: 12px; height: 8px; top: 5px; left: 8px; }
+  #tubes-container { gap: 6px; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="left">
+    <span class="level-label" id="level-label">Level 1</span>
+    <span class="move-counter" id="move-counter">0 moves</span>
+  </div>
+  <div class="right">
+    <button id="btn-undo">Undo</button>
+    <button id="btn-restart">Restart</button>
+    <button id="btn-leaderboard">Best</button>
+  </div>
+</header>
+
+<div id="game-area">
+  <div id="tubes-container"></div>
+</div>
+
+<script>
+(function() {
+  const BALLS_PER_TUBE = 4;
+  const EMPTY_TUBES = 2;
+
+  function getDifficulty(level) {
+    if (level <= 5) return 4;
+    if (level <= 10) return 5;
+    if (level <= 15) return 6;
+    if (level <= 20) return 7;
+    return 8;
+  }
+
+  // State
+  let currentLevel = parseInt(localStorage.getItem('bsp_level') || '1', 10);
+  let tubes = [];
+  let moveHistory = [];
+  let moveCount = 0;
+  let selectedTube = -1;
+  let initialState = [];
+
+  // DOM refs
+  const tubesContainer = document.getElementById('tubes-container');
+  const levelLabel = document.getElementById('level-label');
+  const moveCounter = document.getElementById('move-counter');
+
+  // Generate a solvable puzzle by starting solved and shuffling via legal reverse moves
+  function generatePuzzle(numColors) {
+    const numTubes = numColors + EMPTY_TUBES;
+    // Start solved
+    let state = [];
+    for (let c = 0; c < numColors; c++) {
+      state.push([c, c, c, c]);
+    }
+    for (let i = 0; i < EMPTY_TUBES; i++) {
+      state.push([]);
+    }
+
+    // Shuffle with random legal moves (many iterations for good mixing)
+    const iterations = numColors * 80;
+    for (let i = 0; i < iterations; i++) {
+      const from = Math.floor(Math.random() * numTubes);
+      if (state[from].length === 0) continue;
+      const ball = state[from][state[from].length - 1];
+
+      // Collect legal destinations
+      const dests = [];
+      for (let t = 0; t < numTubes; t++) {
+        if (t === from) continue;
+        if (state[t].length >= BALLS_PER_TUBE) continue;
+        // Allow move to empty or matching top
+        if (state[t].length === 0 || state[t][state[t].length - 1] === ball) {
+          dests.push(t);
+        }
+      }
+      if (dests.length === 0) continue;
+
+      // Skip moves that would keep a tube fully solved
+      // (helps ensure we actually scramble)
+      const to = dests[Math.floor(Math.random() * dests.length)];
+      state[to].push(state[from].pop());
+    }
+
+    // Verify it's not already solved
+    if (isSolved(state)) return generatePuzzle(numColors);
+
+    return state;
+  }
+
+  function isSolved(state) {
+    for (const tube of state) {
+      if (tube.length === 0) continue;
+      if (tube.length !== BALLS_PER_TUBE) return false;
+      if (!tube.every(b => b === tube[0])) return false;
+    }
+    return true;
+  }
+
+  function deepCopy(arr) {
+    return arr.map(t => [...t]);
+  }
+
+  function startLevel(level) {
+    currentLevel = level;
+    localStorage.setItem('bsp_level', String(level));
+    const numColors = getDifficulty(level);
+    tubes = generatePuzzle(numColors);
+    initialState = deepCopy(tubes);
+    moveHistory = [];
+    moveCount = 0;
+    selectedTube = -1;
+    render();
+  }
+
+  function render() {
+    levelLabel.textContent = 'Level ' + currentLevel;
+    moveCounter.textContent = moveCount + (moveCount === 1 ? ' move' : ' moves');
+
+    tubesContainer.innerHTML = '';
+    tubes.forEach((tube, i) => {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'tube-wrapper' + (i === selectedTube ? ' selected' : '');
+      wrapper.addEventListener('click', () => onTubeClick(i));
+
+      const tubeEl = document.createElement('div');
+      tubeEl.className = 'tube';
+
+      tube.forEach(ball => {
+        const ballEl = document.createElement('div');
+        ballEl.className = 'ball ball-' + ball;
+        tubeEl.appendChild(ballEl);
+      });
+
+      wrapper.appendChild(tubeEl);
+      tubesContainer.appendChild(wrapper);
+    });
+  }
+
+  function onTubeClick(index) {
+    if (selectedTube === -1) {
+      // Select source tube (must have balls)
+      if (tubes[index].length === 0) return;
+      selectedTube = index;
+      render();
+      return;
+    }
+
+    if (selectedTube === index) {
+      // Deselect
+      selectedTube = -1;
+      render();
+      return;
+    }
+
+    // Attempt move
+    const from = selectedTube;
+    const to = index;
+    selectedTube = -1;
+
+    if (!canMove(from, to)) {
+      render();
+      return;
+    }
+
+    // Execute move
+    moveHistory.push({ from, to });
+    tubes[to].push(tubes[from].pop());
+    moveCount++;
+    render();
+
+    // Check win
+    if (isSolved(tubes)) {
+      setTimeout(() => onWin(), 250);
+    }
+  }
+
+  function canMove(from, to) {
+    if (tubes[from].length === 0) return false;
+    if (tubes[to].length >= BALLS_PER_TUBE) return false;
+    if (tubes[to].length === 0) return true;
+    return tubes[to][tubes[to].length - 1] === tubes[from][tubes[from].length - 1];
+  }
+
+  function undo() {
+    if (moveHistory.length === 0) return;
+    const { from, to } = moveHistory.pop();
+    tubes[from].push(tubes[to].pop());
+    moveCount--;
+    selectedTube = -1;
+    render();
+  }
+
+  function restart() {
+    tubes = deepCopy(initialState);
+    moveHistory = [];
+    moveCount = 0;
+    selectedTube = -1;
+    render();
+  }
+
+  // Win handling
+  function onWin() {
+    saveBest(currentLevel, moveCount);
+    showConfetti();
+    const best = getBest(currentLevel);
+    showModal(
+      'Level ' + currentLevel + ' Complete!',
+      'Moves: ' + moveCount + (best !== null ? ' | Best: ' + best : ''),
+      [
+        { text: 'Next Level', primary: true, action: () => { closeModal(); startLevel(currentLevel + 1); } },
+        { text: 'Replay', action: () => { closeModal(); startLevel(currentLevel); } }
+      ]
+    );
+  }
+
+  // Leaderboard (localStorage)
+  function saveBest(level, moves) {
+    const key = 'bsp_best';
+    const data = JSON.parse(localStorage.getItem(key) || '{}');
+    if (!data[level] || moves < data[level]) {
+      data[level] = moves;
+      localStorage.setItem(key, JSON.stringify(data));
+    }
+  }
+
+  function getBest(level) {
+    const data = JSON.parse(localStorage.getItem('bsp_best') || '{}');
+    return data[level] || null;
+  }
+
+  function getAllBests() {
+    return JSON.parse(localStorage.getItem('bsp_best') || '{}');
+  }
+
+  function showLeaderboard() {
+    const bests = getAllBests();
+    const levels = Object.keys(bests).map(Number).sort((a, b) => a - b);
+    let tableHTML = '<div class="lb-scroll"><table class="lb-table"><tr><th>Level</th><th>Colors</th><th>Best</th></tr>';
+    if (levels.length === 0) {
+      tableHTML += '<tr><td colspan="3" style="text-align:center;padding:16px;">No scores yet</td></tr>';
+    }
+    for (const lv of levels) {
+      tableHTML += '<tr><td>' + lv + '</td><td>' + getDifficulty(lv) + '</td><td>' + bests[lv] + ' moves</td></tr>';
+    }
+    tableHTML += '</table></div>';
+    showModal('Leaderboard', tableHTML, [
+      { text: 'Close', primary: true, action: closeModal }
+    ], true);
+  }
+
+  // Modal system
+  function showModal(title, content, buttons, isHTML) {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.id = 'modal-overlay';
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) closeModal();
+    });
+
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+
+    const h2 = document.createElement('h2');
+    h2.textContent = title;
+    modal.appendChild(h2);
+
+    const p = document.createElement('div');
+    if (isHTML) {
+      p.innerHTML = content;
+    } else {
+      p.textContent = content;
+      p.style.marginBottom = '16px';
+      p.style.color = '#bbb';
+      p.style.fontSize = '15px';
+    }
+    modal.appendChild(p);
+
+    const btnRow = document.createElement('div');
+    btnRow.className = 'btn-row';
+    for (const b of buttons) {
+      const btn = document.createElement('button');
+      btn.textContent = b.text;
+      if (b.primary) btn.className = 'btn-primary';
+      btn.addEventListener('click', b.action);
+      btnRow.appendChild(btn);
+    }
+    modal.appendChild(btnRow);
+
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+  }
+
+  function closeModal() {
+    const el = document.getElementById('modal-overlay');
+    if (el) el.remove();
+  }
+
+  // Confetti
+  function showConfetti() {
+    const colors = ['#ff6b6b','#54a0ff','#5fe09a','#feca57','#ff9ff3','#ff9f43','#a29bfe','#00d2d3'];
+    for (let i = 0; i < 40; i++) {
+      const c = document.createElement('div');
+      c.className = 'confetti';
+      c.style.left = Math.random() * 100 + 'vw';
+      c.style.background = colors[Math.floor(Math.random() * colors.length)];
+      c.style.width = (6 + Math.random() * 8) + 'px';
+      c.style.height = (6 + Math.random() * 8) + 'px';
+      c.style.borderRadius = Math.random() > 0.5 ? '50%' : '2px';
+      c.style.animationDuration = (1.5 + Math.random() * 2) + 's';
+      c.style.animationDelay = (Math.random() * 0.5) + 's';
+      document.body.appendChild(c);
+      setTimeout(() => c.remove(), 4000);
+    }
+  }
+
+  // Event listeners
+  document.getElementById('btn-undo').addEventListener('click', undo);
+  document.getElementById('btn-restart').addEventListener('click', restart);
+  document.getElementById('btn-leaderboard').addEventListener('click', showLeaderboard);
+
+  // Start
+  startLevel(currentLevel);
+})();
+</script>
+</body>
+</html>
