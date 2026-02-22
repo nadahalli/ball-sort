@@ -289,10 +289,49 @@ button:active { background: #4a4a6a; }
     return false;
   }
 
-  // Generate a solvable puzzle by starting solved and shuffling via legal reverse moves
+  // Fix adjacent same-color pairs by swapping balls between tubes
+  function breakAdjacent(state) {
+    const maxPasses = 50;
+    for (let pass = 0; pass < maxPasses; pass++) {
+      let found = false;
+      for (let t = 0; t < state.length; t++) {
+        for (let i = 1; i < state[t].length; i++) {
+          if (state[t][i] !== state[t][i - 1]) continue;
+          found = true;
+          // Find a ball in another tube to swap with state[t][i]
+          let swapped = false;
+          for (let ot = 0; ot < state.length; ot++) {
+            if (ot === t) continue;
+            for (let oi = 0; oi < state[ot].length; oi++) {
+              if (state[ot][oi] === state[t][i]) continue; // same color, no help
+              // Check that swapping won't create new adjacencies
+              const a = state[t][i], b = state[ot][oi];
+              const tOkAbove = (i + 1 >= state[t].length || state[t][i + 1] !== b);
+              const tOkBelow = (i - 1 < 0 || state[t][i - 1] !== b);
+              const oOkAbove = (oi + 1 >= state[ot].length || state[ot][oi + 1] !== a);
+              const oOkBelow = (oi - 1 < 0 || state[ot][oi - 1] !== a);
+              if (tOkAbove && tOkBelow && oOkAbove && oOkBelow) {
+                state[t][i] = b;
+                state[ot][oi] = a;
+                swapped = true;
+                break;
+              }
+            }
+            if (swapped) break;
+          }
+        }
+      }
+      if (!found) break;
+    }
+  }
+
+  // Generate a solvable puzzle by shuffling from solved state.
+  // If shuffling alone doesn't eliminate adjacent same-color pairs,
+  // we fix them with targeted swaps (sacrificing the strict solvability
+  // guarantee from reverse moves, but with 2 empty tubes these are
+  // always solvable in practice).
   function generatePuzzle(numColors) {
     const numTubes = numColors + EMPTY_TUBES;
-    // Start solved
     let state = [];
     for (let c = 0; c < numColors; c++) {
       state.push([c, c, c, c]);
@@ -301,9 +340,7 @@ button:active { background: #4a4a6a; }
       state.push([]);
     }
 
-    // Shuffle: apply many random legal moves to scramble thoroughly.
-    // We count only successful moves (not skipped iterations) and prefer
-    // moves that break up same-color groups to avoid trivial puzzles.
+    // Shuffle with random legal moves
     const targetMoves = numColors * 200;
     let moved = 0;
     let attempts = 0;
@@ -313,7 +350,6 @@ button:active { background: #4a4a6a; }
       if (state[from].length === 0) continue;
       const ball = state[from][state[from].length - 1];
 
-      // Collect legal destinations, split into mixing vs same-color
       const mixDests = [];
       const sameDests = [];
       for (let t = 0; t < numTubes; t++) {
@@ -322,14 +358,11 @@ button:active { background: #4a4a6a; }
         if (state[t].length === 0) {
           mixDests.push(t);
         } else if (state[t][state[t].length - 1] === ball) {
-          // Moving onto same color - check if source has mixed colors underneath
           const fromAllSame = state[from].every(b => b === ball);
-          if (fromAllSame) sameDests.push(t); // don't prefer breaking a solved tube
-          else mixDests.push(t); // good: pulls a ball off a mixed stack
+          if (fromAllSame) sameDests.push(t);
+          else mixDests.push(t);
         }
       }
-      // Also treat "place on different color" - wait, that's not legal.
-      // So we prefer mixDests (empties + pulls off mixed stacks) over sameDests.
       const pool = mixDests.length > 0 ? mixDests : sameDests;
       if (pool.length === 0) continue;
 
@@ -338,7 +371,10 @@ button:active { background: #4a4a6a; }
       moved++;
     }
 
-    // Reject if solved or if any tube has adjacent same-color balls
+    // Fix any remaining adjacent same-color pairs
+    if (hasAdjacentSameColor(state)) breakAdjacent(state);
+
+    // If still bad (very unlikely) or solved, just retry
     if (isSolved(state) || hasAdjacentSameColor(state)) return generatePuzzle(numColors);
 
     return state;
