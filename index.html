@@ -280,6 +280,15 @@ button:active { background: #4a4a6a; }
   const levelLabel = document.getElementById('level-label');
   const moveCounter = document.getElementById('move-counter');
 
+  function hasAdjacentSameColor(state) {
+    for (const tube of state) {
+      for (let i = 1; i < tube.length; i++) {
+        if (tube[i] === tube[i - 1]) return true;
+      }
+    }
+    return false;
+  }
+
   // Generate a solvable puzzle by starting solved and shuffling via legal reverse moves
   function generatePuzzle(numColors) {
     const numTubes = numColors + EMPTY_TUBES;
@@ -292,33 +301,45 @@ button:active { background: #4a4a6a; }
       state.push([]);
     }
 
-    // Shuffle with random legal moves (many iterations for good mixing)
-    const iterations = numColors * 80;
-    for (let i = 0; i < iterations; i++) {
+    // Shuffle: apply many random legal moves to scramble thoroughly.
+    // We count only successful moves (not skipped iterations) and prefer
+    // moves that break up same-color groups to avoid trivial puzzles.
+    const targetMoves = numColors * 200;
+    let moved = 0;
+    let attempts = 0;
+    while (moved < targetMoves && attempts < targetMoves * 10) {
+      attempts++;
       const from = Math.floor(Math.random() * numTubes);
       if (state[from].length === 0) continue;
       const ball = state[from][state[from].length - 1];
 
-      // Collect legal destinations
-      const dests = [];
+      // Collect legal destinations, split into mixing vs same-color
+      const mixDests = [];
+      const sameDests = [];
       for (let t = 0; t < numTubes; t++) {
         if (t === from) continue;
         if (state[t].length >= BALLS_PER_TUBE) continue;
-        // Allow move to empty or matching top
-        if (state[t].length === 0 || state[t][state[t].length - 1] === ball) {
-          dests.push(t);
+        if (state[t].length === 0) {
+          mixDests.push(t);
+        } else if (state[t][state[t].length - 1] === ball) {
+          // Moving onto same color - check if source has mixed colors underneath
+          const fromAllSame = state[from].every(b => b === ball);
+          if (fromAllSame) sameDests.push(t); // don't prefer breaking a solved tube
+          else mixDests.push(t); // good: pulls a ball off a mixed stack
         }
       }
-      if (dests.length === 0) continue;
+      // Also treat "place on different color" - wait, that's not legal.
+      // So we prefer mixDests (empties + pulls off mixed stacks) over sameDests.
+      const pool = mixDests.length > 0 ? mixDests : sameDests;
+      if (pool.length === 0) continue;
 
-      // Skip moves that would keep a tube fully solved
-      // (helps ensure we actually scramble)
-      const to = dests[Math.floor(Math.random() * dests.length)];
+      const to = pool[Math.floor(Math.random() * pool.length)];
       state[to].push(state[from].pop());
+      moved++;
     }
 
-    // Verify it's not already solved
-    if (isSolved(state)) return generatePuzzle(numColors);
+    // Reject if solved or if any tube has adjacent same-color balls
+    if (isSolved(state) || hasAdjacentSameColor(state)) return generatePuzzle(numColors);
 
     return state;
   }
